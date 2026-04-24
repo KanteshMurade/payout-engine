@@ -10,6 +10,18 @@ from .tasks import process_single_payout
 @api_view(['POST'])
 def create_payout(request):
     try:
+
+        from core.models import Merchant, LedgerEntry
+
+      
+        if not Merchant.objects.exists():
+            m = Merchant.objects.create(name="Default Merchant")
+            LedgerEntry.objects.create(
+                merchant=m,
+                amount_paise=10000,
+                type='credit'
+            )
+        
         merchant_id = request.data.get('merchant_id')
         amount = int(request.data.get('amount_paise'))
         key = request.headers.get('Idempotency-Key')
