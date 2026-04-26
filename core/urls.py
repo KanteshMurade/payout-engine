@@ -5,5 +5,5 @@ urlpatterns = [
     path('payouts', create_payout),
     path('payouts/list/', payout_list),
     path('balance/<int:merchant_id>', get_balance_view),
-    path('credit', add_credit),   
+    path('credit', add_credit),
 ]

@@ -6,17 +6,17 @@
         body {
             font-family: Arial;
             background: #0f172a;
+            color: white;
             display: flex;
             justify-content: center;
             align-items: center;
             height: 100vh;
-            color: white;
         }
         .card {
             background: #1e293b;
-            padding: 30px;
+            padding: 25px;
             border-radius: 12px;
-            width: 300px;
+            width: 320px;
         }
         input {
             width: 100%;
@@ -33,29 +33,37 @@
             color: white;
             border-radius: 6px;
             cursor: pointer;
+            margin-top: 5px;
         }
+        button:hover {
+            background: #16a34a;
+        }
+        .error { color: red; }
+        .success { color: lightgreen; }
     </style>
 </head>
 <body>
 
 <div class="card">
-    <h2>Create Payout</h2>
+    <h2>Payout Dashboard</h2>
 
-    <input id="merchant" placeholder="Merchant ID">
-    <input id="amount" placeholder="Amount">
+    <input id="merchant" placeholder="Merchant ID" value="1">
+    <input id="amount" placeholder="Amount (paise)">
 
-    <button onclick="createPayout()">Send</button>
+    <button onclick="addMoney()">Add ₹100000</button>
+    <button onclick="createPayout()">Send Payout</button>
 
     <p id="balance"></p>
     <p id="status"></p>
 
-    <h4>History</h4>
+    <h3>History</h3>
     <ul id="history"></ul>
 </div>
 
 <script>
-const BASE_URL = "https://payout-engine.onrender.com";  // ✅ FIXED
+const BASE_URL = "https://payout-engine.onrender.com"; // ✅ YOUR BACKEND
 
+// Load Balance
 async function loadBalance() {
     let merchant = document.getElementById("merchant").value;
     if (!merchant) return;
@@ -67,6 +75,7 @@ async function loadBalance() {
         "💰 Balance: ₹" + data.balance;
 }
 
+// Load History
 async function loadHistory() {
     let res = await fetch(`${BASE_URL}/api/v1/payouts/list/`);
     let data = await res.json();
@@ -81,6 +90,25 @@ async function loadHistory() {
     });
 }
 
+// Add Balance
+async function addMoney() {
+    let merchant = document.getElementById("merchant").value;
+
+    await fetch(`${BASE_URL}/api/v1/credit`, {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+            merchant_id: merchant,
+            amount: 100000
+        })
+    });
+
+    loadBalance();
+}
+
+// Create Payout
 async function createPayout() {
     let merchant = document.getElementById("merchant").value;
     let amount = document.getElementById("amount").value;
@@ -100,9 +128,9 @@ async function createPayout() {
 
         let data = await res.json();
 
-        if (res.status === 200) {
+        if (res.ok) {
             document.getElementById("status").innerText =
-                "✅ ID: " + data.payout_id + " | " + data.status;
+                "✅ Payout ID: " + data.payout_id;
         } else {
             document.getElementById("status").innerText =
                 "❌ " + data.error;
@@ -111,15 +139,15 @@ async function createPayout() {
         loadBalance();
         loadHistory();
 
-    } catch (e) {
+    } catch (err) {
         document.getElementById("status").innerText =
             "❌ Server not reachable";
     }
 }
 
-document.getElementById("merchant").addEventListener("input", loadBalance);
-
+// Auto load
 loadHistory();
+loadBalance();
 </script>
 
 </body>

@@ -1,36 +1,33 @@
 from django.db import models
 
+
 class Merchant(models.Model):
     name = models.CharField(max_length=100)
 
-    def __str__(self):
-        return self.name
-
 
 class LedgerEntry(models.Model):
+    TYPE_CHOICES = (
+        ("credit", "Credit"),
+        ("debit", "Debit"),
+    )
+
     merchant = models.ForeignKey(Merchant, on_delete=models.CASCADE)
-    amount = models.BigIntegerField()
-    type = models.CharField(max_length=20)
-    created_at = models.DateTimeField(auto_now_add=True)
+    amount = models.IntegerField()
+    type = models.CharField(max_length=10, choices=TYPE_CHOICES)
 
 
 class Payout(models.Model):
-    STATUS_CHOICES = [
-        ("pending", "pending"),
-        ("processing", "processing"),
-        ("completed", "completed"),
-        ("failed", "failed"),
-    ]
+    STATUS_CHOICES = (
+        ("pending", "Pending"),
+        ("success", "Success"),
+        ("failed", "Failed"),
+    )
 
     merchant = models.ForeignKey(Merchant, on_delete=models.CASCADE)
-    amount = models.BigIntegerField()
-    status = models.CharField(max_length=20, choices=STATUS_CHOICES)
-    idempotency_key = models.CharField(max_length=100)
-    created_at = models.DateTimeField(auto_now_add=True)
+    amount = models.IntegerField()
+    status = models.CharField(max_length=10, choices=STATUS_CHOICES)
 
 
 class IdempotencyKey(models.Model):
-    key = models.CharField(max_length=100)
-    merchant = models.ForeignKey(Merchant, on_delete=models.CASCADE)
-    response = models.JSONField()
-    created_at = models.DateTimeField(auto_now_add=True)
+    key = models.CharField(max_length=100, unique=True)
+    payout = models.ForeignKey(Payout, on_delete=models.CASCADE)
