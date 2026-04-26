@@ -13,7 +13,7 @@ def create_payout(request):
     if not merchant_id or not amount:
         return Response({"error": "Missing fields"}, status=400)
 
-    # Auto create merchant if not exists
+    # Auto create merchant
     merchant, created = Merchant.objects.get_or_create(
         id=merchant_id,
         defaults={"name": f"Merchant {merchant_id}"}
@@ -27,7 +27,7 @@ def create_payout(request):
             type="credit"
         )
 
-    # Idempotency check
+    # Idempotency
     if idempotency_key:
         existing = IdempotencyKey.objects.filter(key=idempotency_key).first()
         if existing:
@@ -88,3 +88,25 @@ def get_balance_view(request, merchant_id):
 
     balance = get_balance(merchant)
     return Response({"balance": balance})
+
+
+@api_view(['POST'])
+def add_credit(request):
+    merchant_id = request.data.get('merchant_id')
+    amount = request.data.get('amount')
+
+    if not merchant_id or not amount:
+        return Response({"error": "Missing fields"}, status=400)
+
+    merchant, _ = Merchant.objects.get_or_create(
+        id=merchant_id,
+        defaults={"name": f"Merchant {merchant_id}"}
+    )
+
+    LedgerEntry.objects.create(
+        merchant=merchant,
+        amount=int(amount),
+        type="credit"
+    )
+
+    return Response({"message": "Balance added"})
