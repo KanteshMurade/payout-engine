@@ -108,7 +108,6 @@ def add_credit(request):
     merchant_id = request.data.get("merchant_id")
     amount = int(request.data.get("amount"))
 
-<<<<<<< HEAD
     merchant = Merchant.objects.get(id=merchant_id)
 
     LedgerEntry.objects.create(
@@ -118,7 +117,7 @@ def add_credit(request):
     )
 
     return Response({"message": "credit added"})
-=======
+
     return Response({
         "id": merchant.id,
         "name": merchant.name,
@@ -145,4 +144,4 @@ def add_balance(request):
         "message": "Balance added",
         "balance": merchant.balance
     })
->>>>>>> 189d1be0b906f5b486987d26560ad3d988ef0f42
+
