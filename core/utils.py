@@ -1,13 +1,6 @@
-from .models import LedgerEntry
-
+from django.db.models import Sum
 
 def get_balance(merchant):
-    credit = LedgerEntry.objects.filter(
-        merchant=merchant, type="credit"
-    ).aggregate(total=models.Sum("amount"))["total"] or 0
-
-    debit = LedgerEntry.objects.filter(
-        merchant=merchant, type="debit"
-    ).aggregate(total=models.Sum("amount"))["total"] or 0
-
-    return credit - debit
+    credits = merchant.ledgerentry_set.filter(type='credit').aggregate(Sum('amount'))['amount__sum'] or 0
+    debits = merchant.ledgerentry_set.filter(type='debit').aggregate(Sum('amount'))['amount__sum'] or 0
+    return credits - debits
