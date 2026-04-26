@@ -1,30 +1,15 @@
-from rest_framework.decorators import api_view
-from rest_framework.response import Response
-from django.db import transaction
-from django.utils import timezone
-from datetime import timedelta
-from .models import *
-from .utils import get_balance
-from .tasks import process_single_payout   
-
 @api_view(['POST'])
 def create_payout(request):
     try:
-
-        from core.models import Merchant, LedgerEntry
-
-      
-        if not Merchant.objects.exists():
-            m = Merchant.objects.create(name="Default Merchant")
-            LedgerEntry.objects.create(
-                merchant=m,
-                amount_paise=10000,
-                type='credit'
-            )
-        
         merchant_id = request.data.get('merchant_id')
-        amount = int(request.data.get('amount_paise'))
+        amount = request.data.get('amount_paise')
         key = request.headers.get('Idempotency-Key')
+
+        # ✅ ADD THIS (VERY IMPORTANT)
+        if not merchant_id or not amount:
+            return Response({"error": "Missing merchant_id or amount"}, status=400)
+
+        amount = int(amount)
 
         merchant = Merchant.objects.get(id=merchant_id)
 
@@ -54,7 +39,6 @@ def create_payout(request):
                 idempotency_key=key
             )
 
-       
         process_single_payout.delay(payout.id)
 
         response = {
