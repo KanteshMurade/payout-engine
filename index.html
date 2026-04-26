@@ -13,17 +13,20 @@
 <button onclick="send()">Send</button>
 
 <h3 id="balance"></h3>
+
 <div id="result"></div>
 
 <h3>History</h3>
 <ul id="history"></ul>
 
 <script>
+const BASE_URL = "https://payout-engine.onrender.com";
+
 async function send() {
   const merchant = document.getElementById("merchant").value;
   const amount = document.getElementById("amount").value;
 
-  const res = await fetch("https://payout-engine.onrender.com/api/v1/payouts", {
+  const res = await fetch(BASE_URL + "/api/v1/payouts", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -38,40 +41,55 @@ async function send() {
   const data = await res.json();
 
   if (data.error) {
-    document.getElementById("result").innerText = data.error;
+    document.getElementById("result").innerText = "❌ " + data.error;
     return;
   }
 
   document.getElementById("result").innerText =
-    "ID: " + data.payout_id + " Status: " + data.status;
+    "✅ ID: " + data.payout_id + " | Status: " + data.status;
 
   loadHistory();
   loadBalance(merchant);
 }
 
+
+// ✅ HISTORY LOAD 
 async function loadHistory() {
-  const res = await fetch("https://payout-engine.onrender.com/api/v1/payouts/list");
-  const data = await res.json();
+  try {
+    const res = await fetch(BASE_URL + "/api/v1/payouts/list");
+    const data = await res.json();
 
-  let html = "";
-  data.forEach(p => {
-    html += `<li>ID ${p.id} - ${p.amount} - ${p.status}</li>`;
-  });
+    let html = "";
+    data.forEach(p => {
+      html += `<li>ID ${p.id} | ₹${p.amount} | ${p.status}</li>`;
+    });
 
-  document.getElementById("history").innerHTML = html;
-}
-
-async function loadBalance(id) {
-  const res = await fetch(`https://payout-engine.onrender.com/api/v1/balance/${id}`);
-  const data = await res.json();
-
-  if (!data.error) {
-    document.getElementById("balance").innerText =
-      "Balance: " + data.balance;
+    document.getElementById("history").innerHTML = html;
+  } catch (e) {
+    console.log("History error:", e);
   }
 }
 
+
+// ✅ BALANCE LOAD
+async function loadBalance(id) {
+  try {
+    const res = await fetch(BASE_URL + "/api/v1/balance/" + id);
+    const data = await res.json();
+
+    if (!data.error) {
+      document.getElementById("balance").innerText =
+        "💰 Balance: " + data.balance;
+    }
+  } catch (e) {
+    console.log("Balance error:", e);
+  }
+}
+
+
+
 loadHistory();
+
 </script>
 
 </body>

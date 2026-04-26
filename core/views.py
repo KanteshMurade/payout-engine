@@ -43,7 +43,7 @@ def create_payout(request):
         with transaction.atomic():
             merchant_locked = Merchant.objects.select_for_update().get(id=merchant.id)
 
-            balance = get_balance(merchant_locked) or 0
+            balance = get_balance(merchant_locked)
 
             if balance < amount:
                 return Response({"error": "Insufficient balance"}, status=400)
@@ -76,7 +76,7 @@ def create_payout(request):
 
 @api_view(['GET'])
 def payout_list(request):
-    payouts = Payout.objects.all().order_by('-id')[:10]
+    payouts = Payout.objects.all().order_by('-id')[:20]
 
     data = []
     for p in payouts:
@@ -94,7 +94,6 @@ def payout_list(request):
 def get_balance_api(request, merchant_id):
     try:
         merchant = Merchant.objects.get(id=merchant_id)
-        balance = get_balance(merchant)
-        return Response({"balance": balance})
+        return Response({"balance": merchant.balance})
     except:
         return Response({"error": "Invalid merchant"}, status=400)
