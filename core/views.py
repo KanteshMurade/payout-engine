@@ -1,37 +1,88 @@
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
-from .models import Merchant, Payout
+from django.db import transaction
+from .models import *
+from .utils import get_balance
+import random
+import time
 
 
 @api_view(['POST'])
 def create_payout(request):
     merchant_id = request.data.get("merchant_id")
-    amount = request.data.get("amount_paise")
+    amount = int(request.data.get("amount_paise"))
+    key = request.headers.get("Idempotency-Key")
 
-    if not merchant_id or not amount:
-        return Response({"error": "Missing fields"}, status=400)
+    merchant = Merchant.objects.get(id=merchant_id)
 
-    try:
-        merchant = Merchant.objects.get(id=merchant_id)
-    except Merchant.DoesNotExist:
-        return Response({"error": "Merchant not found"}, status=404)
+    # IDEMPOTENCY
+    existing = IdempotencyKey.objects.filter(
+        key=key, merchant=merchant
+    ).first()
 
-    if merchant.balance < amount:
-        return Response({"error": "Insufficient balance"}, status=400)
+    if existing:
+        return Response(existing.response)
 
-    merchant.balance -= amount
-    merchant.save()
+    # CONCURRENCY
+    with transaction.atomic():
+        merchant_locked = Merchant.objects.select_for_update().get(id=merchant.id)
 
-    payout = Payout.objects.create(
-        merchant=merchant,
-        amount=amount,
-        status="pending"
-    )
+        balance = get_balance(merchant_locked)
 
-    return Response({
+        if balance < amount:
+            return Response({"error": "Insufficient balance"}, status=400)
+
+        LedgerEntry.objects.create(
+            merchant=merchant_locked,
+            amount=-amount,
+            type="hold"
+        )
+
+        payout = Payout.objects.create(
+            merchant=merchant_locked,
+            amount=amount,
+            status="pending",
+            idempotency_key=key
+        )
+
+    process_payout(payout.id)
+
+    response = {
         "payout_id": payout.id,
         "status": payout.status
-    })
+    }
+
+    IdempotencyKey.objects.create(
+        key=key,
+        merchant=merchant,
+        response=response
+    )
+
+    return Response(response)
+
+
+def process_payout(payout_id):
+    payout = Payout.objects.get(id=payout_id)
+
+    payout.status = "processing"
+    payout.save()
+
+    time.sleep(2)
+
+    r = random.randint(1, 100)
+
+    if r <= 70:
+        payout.status = "completed"
+    else:
+        payout.status = "failed"
+
+        LedgerEntry.objects.create(
+            merchant=payout.merchant,
+            amount=payout.amount,
+            type="refund"
+        )
+
+    payout.save()
 
 
 @api_view(['GET'])
@@ -52,15 +103,17 @@ def payout_list(request):
     return Response(data)
 
 
-@api_view(['GET'])
-def merchant_detail(request, merchant_id):
-    try:
-        merchant = Merchant.objects.get(id=merchant_id)
-    except Merchant.DoesNotExist:
-        return Response({"error": "Not found"}, status=404)
+@api_view(['POST'])
+def add_credit(request):
+    merchant_id = request.data.get("merchant_id")
+    amount = int(request.data.get("amount"))
 
-    return Response({
-        "id": merchant.id,
-        "name": merchant.name,
-        "balance": merchant.balance
-    })
+    merchant = Merchant.objects.get(id=merchant_id)
+
+    LedgerEntry.objects.create(
+        merchant=merchant,
+        amount=amount,
+        type="credit"
+    )
+
+    return Response({"message": "credit added"})
