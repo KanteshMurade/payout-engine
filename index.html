@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Payout UI</title>
+</head>
+<body>
+
+<h2>Create Payout</h2>
+
+<input id="merchant" placeholder="Merchant ID"><br><br>
+<input id="amount" placeholder="Amount"><br><br>
+
+<button onclick="send()">Send</button>
+
+<pre id="result"></pre>
+
+<script>
+function send() {
+    fetch("https://payout-engine.onrender.com/api/v1/payouts", {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+            "Idempotency-Key": "ui-" + Date.now()
+        },
+        body: JSON.stringify({
+            merchant_id: parseInt(document.getElementById("merchant").value),
+            amount_paise: parseInt(document.getElementById("amount").value)
+        })
+    })
+    .then(res => res.json())
+    .then(data => {
+        document.getElementById("result").innerText = JSON.stringify(data, null, 2);
+    })
+    .catch(err => {
+        document.getElementById("result").innerText = err;
+    });
+}
+</script>
+
+</body>
+</html>
