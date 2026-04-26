@@ -4,28 +4,28 @@
   <title>Payout Dashboard</title>
   <style>
     body {
+      background: #0b1a2f;
       font-family: Arial;
-      background: #0f172a;
-      color: white;
       display: flex;
       justify-content: center;
       align-items: center;
       height: 100vh;
+      color: white;
     }
 
     .card {
-      background: #1e293b;
+      background: #1e2a44;
       padding: 30px;
-      border-radius: 12px;
+      border-radius: 10px;
       width: 300px;
-      box-shadow: 0 10px 25px rgba(0,0,0,0.4);
+      text-align: center;
     }
 
     input {
       width: 100%;
       padding: 10px;
       margin: 10px 0;
-      border-radius: 6px;
+      border-radius: 5px;
       border: none;
     }
 
@@ -33,19 +33,15 @@
       width: 100%;
       padding: 10px;
       background: #22c55e;
-      color: white;
       border: none;
-      border-radius: 6px;
+      border-radius: 5px;
+      color: white;
       cursor: pointer;
     }
 
-    button:hover {
-      background: #16a34a;
-    }
-
-    .result {
+    #result {
       margin-top: 15px;
-      font-size: 14px;
+      text-align: left;
     }
   </style>
 </head>
@@ -60,13 +56,16 @@
 
   <button onclick="send()">Send</button>
 
-  <div class="result" id="result"></div>
+  <div id="result"></div>
 </div>
 
 <script>
 async function send() {
   const merchant = document.getElementById("merchant").value;
   const amount = document.getElementById("amount").value;
+  const resultDiv = document.getElementById("result");
+
+  resultDiv.innerHTML = "Processing... ⏳";
 
   try {
     const res = await fetch("https://payout-engine.onrender.com/api/v1/payouts", {
@@ -83,11 +82,23 @@ async function send() {
 
     const data = await res.json();
 
-    document.getElementById("result").innerHTML =
-      `<b>Success:</b><br>ID: ${data.payout_id}<br>Status: ${data.status}`;
+    // 🔴 Handle backend error
+    if (data.error) {
+      resultDiv.innerHTML = `<span style="color:red">❌ ${data.error}</span>`;
+      return;
+    }
+
+    // 🟢 Success
+    resultDiv.innerHTML = `
+      <span style="color:lightgreen">
+      ✅ Success <br>
+      ID: ${data.payout_id} <br>
+      Status: ${data.status}
+      </span>
+    `;
 
   } catch (err) {
-    document.getElementById("result").innerText = "Error: " + err;
+    resultDiv.innerHTML = `<span style="color:red">⚠️ Network Error</span>`;
   }
 }
 </script>
