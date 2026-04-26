@@ -1,149 +1,58 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Payout Dashboard</title>
-  <style>
-    body {
-      font-family: Arial;
-      background: #0f172a;
-      color: white;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      height: 100vh;
-    }
-
-    .card {
-      background: #1e293b;
-      padding: 30px;
-      border-radius: 12px;
-      width: 320px;
-      box-shadow: 0 0 20px rgba(0,0,0,0.5);
-    }
-
-    h2 {
-      text-align: center;
-    }
-
-    input {
-      width: 100%;
-      padding: 10px;
-      margin: 8px 0;
-      border-radius: 6px;
-      border: none;
-    }
-
-    button {
-      width: 100%;
-      padding: 10px;
-      background: #22c55e;
-      color: white;
-      border: none;
-      border-radius: 6px;
-      cursor: pointer;
-      font-weight: bold;
-    }
-
-    .result {
-      margin-top: 10px;
-    }
-
-    .success {
-      color: #4ade80;
-    }
-
-    .error {
-      color: #f87171;
-    }
-
-    .history {
-      margin-top: 15px;
-      font-size: 14px;
-    }
-
-    .balance {
-      margin-top: 10px;
-      color: #facc15;
-      font-weight: bold;
-    }
-  </style>
+<title>Payout</title>
 </head>
 
 <body>
+<h2>Create Payout</h2>
 
-<div class="card">
-  <h2>Create Payout</h2>
+<input id="merchant" placeholder="Merchant ID"><br><br>
+<input id="amount" placeholder="Amount"><br><br>
 
-  <input id="merchant" placeholder="Merchant ID" />
-  <input id="amount" placeholder="Amount (paise)" />
+<button onclick="send()">Send</button>
 
-  <button onclick="send()">Send</button>
+<p id="result"></p>
 
-  <div class="balance" id="balance"></div>
-  <div class="result" id="result"></div>
-
-  <div class="history">
-    <h3>History</h3>
-    <ul id="history"></ul>
-  </div>
-</div>
+<h3>History</h3>
+<ul id="history"></ul>
 
 <script>
-const BASE_URL = "https://payout-engine.onrender.com";
+const BASE = "https://payout-engine.onrender.com";
 
 async function send() {
-  const merchant = document.getElementById("merchant").value;
-  const amount = document.getElementById("amount").value;
+  let merchant = document.getElementById("merchant").value;
+  let amount = document.getElementById("amount").value;
 
-  try {
-    const res = await fetch(BASE_URL + "/api/v1/payouts", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Idempotency-Key": Date.now()
-      },
-      body: JSON.stringify({
-        merchant_id: parseInt(merchant),
-        amount_paise: parseInt(amount)
-      })
-    });
+  let res = await fetch(BASE + "/api/v1/payouts", {
+    method: "POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({
+      merchant_id: parseInt(merchant),
+      amount_paise: parseInt(amount)
+    })
+  });
 
-    const data = await res.json();
+  let data = await res.json();
 
-    document.getElementById("result").innerHTML =
-      `<div class="success">✔ ID: ${data.payout_id} | ${data.status}</div>`;
+  document.getElementById("result").innerText =
+    "ID: " + data.payout_id + " Status: " + data.status;
 
-    loadData(merchant);
-
-  } catch (err) {
-    document.getElementById("result").innerHTML =
-      `<div class="error">❌ ${err.message}</div>`;
-  }
+  loadHistory(merchant);
 }
 
-async function loadData(merchant) {
-  try {
-    const bal = await fetch(BASE_URL + `/api/v1/merchant/${merchant}`);
-    const balData = await bal.json();
+async function loadHistory(m) {
+  let res = await fetch(BASE + "/api/v1/payouts/list/?merchant_id=" + m);
+  let data = await res.json();
 
-    document.getElementById("balance").innerText =
-      `💰 Balance: ${balData.balance}`;
+  let ul = document.getElementById("history");
+  ul.innerHTML = "";
 
-    const res = await fetch(BASE_URL + `/api/v1/payouts/list?merchant_id=${merchant}`);
-    const list = await res.json();
-
-    const ul = document.getElementById("history");
-    ul.innerHTML = "";
-
-    list.forEach(p => {
-      const li = document.createElement("li");
-      li.innerText = `ID ${p.id} | ₹${p.amount} | ${p.status}`;
-      ul.appendChild(li);
-    });
-
-  } catch (e) {
-    console.log(e);
-  }
+  data.forEach(p => {
+    let li = document.createElement("li");
+    li.innerText = `ID ${p.id} | ${p.amount} | ${p.status}`;
+    ul.appendChild(li);
+  });
 }
 </script>
 
