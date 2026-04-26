@@ -1,93 +1,96 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-<meta charset="UTF-8">
-<title>Payout Dashboard</title>
-
-<style>
-body {
-    margin: 0;
-    font-family: Arial;
-    background: linear-gradient(to right, #0f172a, #1e293b);
-    color: white;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    height: 100vh;
-}
-.card {
-    background: #1e293b;
-    padding: 30px;
-    border-radius: 12px;
-    width: 300px;
-    text-align: center;
-    box-shadow: 0 0 20px rgba(0,0,0,0.5);
-}
-input {
-    width: 100%;
-    padding: 10px;
-    margin: 10px 0;
-    border-radius: 6px;
-    border: none;
-}
-button {
-    width: 100%;
-    padding: 10px;
-    background: #22c55e;
-    border: none;
-    border-radius: 6px;
-    color: white;
-    cursor: pointer;
-}
-button:hover {
-    background: #16a34a;
-}
-.status {
-    margin-top: 10px;
-}
-.success { color: #22c55e; }
-.error { color: #ef4444; }
-.history {
-    text-align: left;
-    margin-top: 15px;
-}
-</style>
-
+    <title>Payout Dashboard</title>
+    <style>
+        body {
+            font-family: Arial;
+            background: #0f172a;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            color: white;
+        }
+        .card {
+            background: #1e293b;
+            padding: 30px;
+            border-radius: 12px;
+            width: 300px;
+        }
+        input {
+            width: 100%;
+            padding: 10px;
+            margin: 8px 0;
+            border-radius: 6px;
+            border: none;
+        }
+        button {
+            width: 100%;
+            padding: 10px;
+            background: #22c55e;
+            border: none;
+            color: white;
+            border-radius: 6px;
+            cursor: pointer;
+        }
+    </style>
 </head>
 <body>
 
 <div class="card">
     <h2>Create Payout</h2>
 
-    <input type="number" id="merchant" placeholder="Merchant ID" value="1">
-    <input type="number" id="amount" placeholder="Amount (paise)">
+    <input id="merchant" placeholder="Merchant ID">
+    <input id="amount" placeholder="Amount">
 
     <button onclick="createPayout()">Send</button>
 
-    <div id="balance"></div>
-    <div id="result" class="status"></div>
+    <p id="balance"></p>
+    <p id="status"></p>
 
-    <div class="history">
-        <h4>History</h4>
-        <ul id="history"></ul>
-    </div>
+    <h4>History</h4>
+    <ul id="history"></ul>
 </div>
 
 <script>
-const API = "https://payout-engine.onrender.com/api/v1"; // your backend
+const BASE_URL = "https://payout-engine.onrender.com";  // ✅ FIXED
+
+async function loadBalance() {
+    let merchant = document.getElementById("merchant").value;
+    if (!merchant) return;
+
+    let res = await fetch(`${BASE_URL}/api/v1/balance/${merchant}`);
+    let data = await res.json();
+
+    document.getElementById("balance").innerText =
+        "💰 Balance: ₹" + data.balance;
+}
+
+async function loadHistory() {
+    let res = await fetch(`${BASE_URL}/api/v1/payouts/list/`);
+    let data = await res.json();
+
+    let list = document.getElementById("history");
+    list.innerHTML = "";
+
+    data.forEach(p => {
+        let li = document.createElement("li");
+        li.innerText = `ID ${p.id} | ₹${p.amount} | ${p.status}`;
+        list.appendChild(li);
+    });
+}
 
 async function createPayout() {
-    const merchant = document.getElementById("merchant").value;
-    const amount = document.getElementById("amount").value;
-
-    const resDiv = document.getElementById("result");
+    let merchant = document.getElementById("merchant").value;
+    let amount = document.getElementById("amount").value;
 
     try {
-        const res = await fetch(`${API}/payouts`, {
+        let res = await fetch(`${BASE_URL}/api/v1/payouts`, {
             method: "POST",
             headers: {
                 "Content-Type": "application/json",
-                "Idempotency-Key": Math.random().toString()
+                "Idempotency-Key": Date.now()
             },
             body: JSON.stringify({
                 merchant_id: merchant,
@@ -95,52 +98,28 @@ async function createPayout() {
             })
         });
 
-        const data = await res.json();
+        let data = await res.json();
 
-        if (res.ok) {
-            resDiv.innerHTML = `✔ ID: ${data.payout_id} | ${data.status}`;
-            resDiv.className = "status success";
+        if (res.status === 200) {
+            document.getElementById("status").innerText =
+                "✅ ID: " + data.payout_id + " | " + data.status;
         } else {
-            resDiv.innerHTML = `❌ ${data.error}`;
-            resDiv.className = "status error";
+            document.getElementById("status").innerText =
+                "❌ " + data.error;
         }
 
-        loadHistory();
         loadBalance();
+        loadHistory();
 
     } catch (e) {
-        resDiv.innerHTML = "❌ Server not reachable";
-        resDiv.className = "status error";
+        document.getElementById("status").innerText =
+            "❌ Server not reachable";
     }
 }
 
-async function loadHistory() {
-    const res = await fetch(`${API}/payouts/list/`);
-    const data = await res.json();
+document.getElementById("merchant").addEventListener("input", loadBalance);
 
-    const list = document.getElementById("history");
-    list.innerHTML = "";
-
-    data.forEach(p => {
-        const li = document.createElement("li");
-        li.innerText = `ID ${p.id} | ₹${p.amount} | ${p.status}`;
-        list.appendChild(li);
-    });
-}
-
-async function loadBalance() {
-    const merchant = document.getElementById("merchant").value;
-
-    const res = await fetch(`${API}/balance/${merchant}`);
-    const data = await res.json();
-
-    document.getElementById("balance").innerHTML =
-        `💰 Balance: ₹${data.balance}`;
-}
-
-// auto load
 loadHistory();
-loadBalance();
 </script>
 
 </body>
