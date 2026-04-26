@@ -64,3 +64,24 @@ def merchant_detail(request, merchant_id):
         "name": merchant.name,
         "balance": merchant.balance
     })
+
+@api_view(['POST'])
+def add_balance(request):
+    merchant_id = request.data.get("merchant_id")
+    amount = request.data.get("amount")
+
+    if not merchant_id or not amount:
+        return Response({"error": "Missing fields"}, status=400)
+
+    try:
+        merchant = Merchant.objects.get(id=merchant_id)
+    except Merchant.DoesNotExist:
+        return Response({"error": "Merchant not found"}, status=404)
+
+    merchant.balance += int(amount)
+    merchant.save()
+
+    return Response({
+        "message": "Balance added",
+        "balance": merchant.balance
+    })
