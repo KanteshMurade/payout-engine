@@ -2,6 +2,7 @@
 <html>
 <head>
   <title>Payout Dashboard</title>
+
   <style>
     body {
       font-family: Arial;
@@ -15,7 +16,7 @@
 
     .card {
       background: #1e293b;
-      padding: 30px;
+      padding: 25px;
       border-radius: 12px;
       width: 320px;
       box-shadow: 0 0 20px rgba(0,0,0,0.5);
@@ -23,12 +24,13 @@
 
     h2 {
       text-align: center;
+      margin-bottom: 15px;
     }
 
     input {
       width: 100%;
       padding: 10px;
-      margin: 8px 0;
+      margin: 6px 0;
       border-radius: 6px;
       border: none;
     }
@@ -36,6 +38,7 @@
     button {
       width: 100%;
       padding: 10px;
+      margin-top: 10px;
       background: #22c55e;
       color: white;
       border: none;
@@ -44,16 +47,20 @@
       font-weight: bold;
     }
 
-    .result {
-      margin-top: 10px;
-    }
-
     .success {
       color: #4ade80;
+      margin-top: 10px;
     }
 
     .error {
       color: #f87171;
+      margin-top: 10px;
+    }
+
+    .balance {
+      margin-top: 10px;
+      color: #facc15;
+      font-weight: bold;
     }
 
     .history {
@@ -61,10 +68,8 @@
       font-size: 14px;
     }
 
-    .balance {
-      margin-top: 10px;
-      color: #facc15;
-      font-weight: bold;
+    ul {
+      padding-left: 15px;
     }
   </style>
 </head>
@@ -79,8 +84,8 @@
 
   <button onclick="send()">Send</button>
 
-  <div class="balance" id="balance"></div>
-  <div class="result" id="result"></div>
+  <div id="balance" class="balance"></div>
+  <div id="result"></div>
 
   <div class="history">
     <h3>History</h3>
@@ -95,8 +100,13 @@ async function send() {
   const merchant = document.getElementById("merchant").value;
   const amount = document.getElementById("amount").value;
 
+  if (!merchant || !amount) {
+    showError("Enter all fields");
+    return;
+  }
+
   try {
-    const res = await fetch(BASE_URL + "/api/v1/payouts", {
+    const res = await fetch(BASE_URL + "/api/v1/payouts/", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -110,26 +120,43 @@ async function send() {
 
     const data = await res.json();
 
-    document.getElementById("result").innerHTML =
-      `<div class="success">✔ ID: ${data.payout_id} | ${data.status}</div>`;
+    if (!res.ok) {
+      showError(data.error || JSON.stringify(data));
+      return;
+    }
+
+    showSuccess(`✔ ID: ${data.payout_id} | ${data.status}`);
 
     loadData(merchant);
 
   } catch (err) {
-    document.getElementById("result").innerHTML =
-      `<div class="error">❌ ${err.message}</div>`;
+    showError("Server not reachable");
   }
+}
+
+function showSuccess(msg) {
+  document.getElementById("result").innerHTML =
+    `<div class="success">${msg}</div>`;
+}
+
+function showError(msg) {
+  document.getElementById("result").innerHTML =
+    `<div class="error">❌ ${msg}</div>`;
 }
 
 async function loadData(merchant) {
   try {
-    const bal = await fetch(BASE_URL + `/api/v1/merchant/${merchant}`);
-    const balData = await bal.json();
+    // Balance API
+    const balRes = await fetch(BASE_URL + `/api/v1/merchant/${merchant}/`);
+    const balData = await balRes.json();
 
-    document.getElementById("balance").innerText =
-      `💰 Balance: ${balData.balance}`;
+    if (balRes.ok) {
+      document.getElementById("balance").innerText =
+        `💰 Balance: ${balData.balance}`;
+    }
 
-    const res = await fetch(BASE_URL + `/api/v1/payouts/list?merchant_id=${merchant}`);
+    // History API
+    const res = await fetch(BASE_URL + `/api/v1/payouts/list/?merchant_id=${merchant}`);
     const list = await res.json();
 
     const ul = document.getElementById("history");
@@ -142,7 +169,7 @@ async function loadData(merchant) {
     });
 
   } catch (e) {
-    console.log(e);
+    console.log("Error loading data", e);
   }
 }
 </script>
