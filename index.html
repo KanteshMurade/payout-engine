@@ -1,153 +1,127 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Payout Dashboard</title>
-    <style>
-        body {
-            font-family: Arial;
-            background: #0f172a;
-            color: white;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            height: 100vh;
-        }
-        .card {
-            background: #1e293b;
-            padding: 25px;
-            border-radius: 12px;
-            width: 320px;
-        }
-        input {
-            width: 100%;
-            padding: 10px;
-            margin: 8px 0;
-            border-radius: 6px;
-            border: none;
-        }
-        button {
-            width: 100%;
-            padding: 10px;
-            background: #22c55e;
-            border: none;
-            color: white;
-            border-radius: 6px;
-            cursor: pointer;
-            margin-top: 5px;
-        }
-        button:hover {
-            background: #16a34a;
-        }
-        .error { color: red; }
-        .success { color: lightgreen; }
-    </style>
+  <title>Payout Dashboard</title>
+  <style>
+    body {
+      background: linear-gradient(to right, #0f2027, #203a43, #2c5364);
+      font-family: Arial;
+      color: white;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+    }
+    .card {
+      background: #1e293b;
+      padding: 20px;
+      border-radius: 10px;
+      width: 300px;
+    }
+    input {
+      width: 100%;
+      margin: 5px 0;
+      padding: 8px;
+    }
+    button {
+      width: 100%;
+      padding: 10px;
+      margin-top: 5px;
+      background: #22c55e;
+      border: none;
+      color: white;
+      cursor: pointer;
+    }
+    .error { color: red; }
+  </style>
 </head>
+
 <body>
-
 <div class="card">
-    <h2>Payout Dashboard</h2>
+  <h2>Create Payout</h2>
 
-    <input id="merchant" placeholder="Merchant ID" value="1">
-    <input id="amount" placeholder="Amount (paise)">
+  <input id="merchant" placeholder="Merchant ID" value="1"/>
+  <input id="amount" placeholder="Amount (₹)"/>
 
-    <button onclick="addMoney()">Add ₹100000</button>
-    <button onclick="createPayout()">Send Payout</button>
+  <button onclick="createPayout()">Send</button>
+  <button onclick="addMoney()">Add ₹10000</button>
 
-    <p id="balance"></p>
-    <p id="status"></p>
+  <p>💰 Balance: ₹<span id="balance">0</span></p>
+  <p id="msg" class="error"></p>
 
-    <h3>History</h3>
-    <ul id="history"></ul>
+  <h3>History</h3>
+  <ul id="history"></ul>
 </div>
 
 <script>
-const BASE_URL = "https://payout-engine.onrender.com"; // ✅ YOUR BACKEND
+const BASE_URL = "https://payout-engine.onrender.com/api/v1";
 
-// Load Balance
-async function loadBalance() {
-    let merchant = document.getElementById("merchant").value;
-    if (!merchant) return;
-
-    let res = await fetch(`${BASE_URL}/api/v1/balance/${merchant}`);
-    let data = await res.json();
-
-    document.getElementById("balance").innerText =
-        "💰 Balance: ₹" + data.balance;
-}
-
-// Load History
-async function loadHistory() {
-    let res = await fetch(`${BASE_URL}/api/v1/payouts/list/`);
-    let data = await res.json();
-
-    let list = document.getElementById("history");
-    list.innerHTML = "";
-
-    data.forEach(p => {
-        let li = document.createElement("li");
-        li.innerText = `ID ${p.id} | ₹${p.amount} | ${p.status}`;
-        list.appendChild(li);
-    });
-}
-
-// Add Balance
-async function addMoney() {
-    let merchant = document.getElementById("merchant").value;
-
-    await fetch(`${BASE_URL}/api/v1/credit`, {
-        method: "POST",
-        headers: {
-            "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-            merchant_id: merchant,
-            amount: 100000
-        })
-    });
-
-    loadBalance();
-}
-
-// Create Payout
 async function createPayout() {
-    let merchant = document.getElementById("merchant").value;
-    let amount = document.getElementById("amount").value;
+  const merchant = document.getElementById("merchant").value;
+  const amount = document.getElementById("amount").value;
 
-    try {
-        let res = await fetch(`${BASE_URL}/api/v1/payouts`, {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-                "Idempotency-Key": Date.now()
-            },
-            body: JSON.stringify({
-                merchant_id: merchant,
-                amount_paise: amount
-            })
-        });
+  try {
+    const res = await fetch(BASE_URL + "/payouts", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Idempotency-Key": Math.random().toString()
+      },
+      body: JSON.stringify({
+        merchant_id: merchant,
+        amount_paise: amount * 100
+      })
+    });
 
-        let data = await res.json();
+    const data = await res.json();
 
-        if (res.ok) {
-            document.getElementById("status").innerText =
-                "✅ Payout ID: " + data.payout_id;
-        } else {
-            document.getElementById("status").innerText =
-                "❌ " + data.error;
-        }
-
-        loadBalance();
-        loadHistory();
-
-    } catch (err) {
-        document.getElementById("status").innerText =
-            "❌ Server not reachable";
+    if (!res.ok) {
+      document.getElementById("msg").innerText = data.error;
+    } else {
+      document.getElementById("msg").innerText = "✅ Success";
+      loadData();
     }
+  } catch {
+    document.getElementById("msg").innerText = "❌ Server not reachable";
+  }
 }
 
-// Auto load
-loadHistory();
-loadBalance();
+async function addMoney() {
+  const merchant = document.getElementById("merchant").value;
+
+  await fetch(BASE_URL + "/credit", {
+    method: "POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({
+      merchant_id: merchant,
+      amount: 1000000
+    })
+  });
+
+  loadData();
+}
+
+async function loadData() {
+  const merchant = document.getElementById("merchant").value;
+
+  // Balance
+  const b = await fetch(BASE_URL + "/balance/" + merchant);
+  const bdata = await b.json();
+  document.getElementById("balance").innerText = bdata.balance / 100;
+
+  // History
+  const h = await fetch(BASE_URL + "/payouts/list/");
+  const hdata = await h.json();
+
+  let html = "";
+  hdata.forEach(p => {
+    html += `<li>ID ${p.id} | ₹${p.amount/100} | ${p.status}</li>`;
+  });
+
+  document.getElementById("history").innerHTML = html;
+}
+
+loadData();
 </script>
 
 </body>

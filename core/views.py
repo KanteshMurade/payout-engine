@@ -1,118 +1,66 @@
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
-from django.db import transaction
-from django.db.models import Sum
-
 from .models import Merchant, Payout, LedgerEntry, IdempotencyKey
+from django.shortcuts import get_object_or_404
+from .utils import get_balance
 
-
-# ------------------ Helper ------------------
-def get_balance(merchant):
-    credit = LedgerEntry.objects.filter(
-        merchant=merchant, type="credit"
-    ).aggregate(total=Sum("amount"))["total"] or 0
-
-    debit = LedgerEntry.objects.filter(
-        merchant=merchant, type="debit"
-    ).aggregate(total=Sum("amount"))["total"] or 0
-
-    return credit - debit
-
-
-# ------------------ Create Payout ------------------
-@api_view(["POST"])
+@api_view(['POST'])
 def create_payout(request):
     merchant_id = request.data.get("merchant_id")
-    amount = request.data.get("amount_paise")
-    idem_key = request.headers.get("Idempotency-Key")
+    amount = int(request.data.get("amount_paise", 0))
+    key = request.headers.get("Idempotency-Key")
 
-    if not merchant_id or not amount:
-        return Response({"error": "Missing fields"}, status=400)
+    merchant, _ = Merchant.objects.get_or_create(
+        id=merchant_id,
+        defaults={"name": f"Merchant {merchant_id}"}
+    )
 
-    amount = int(amount)
+    if IdempotencyKey.objects.filter(key=key).exists():
+        payout = IdempotencyKey.objects.get(key=key).payout
+        return Response({"payout_id": payout.id, "status": payout.status})
 
-    try:
-        merchant = Merchant.objects.get(id=merchant_id)
-    except Merchant.DoesNotExist:
-        return Response({"error": "Merchant not found"}, status=404)
+    balance = get_balance(merchant)
 
-    # Idempotency check
-    if idem_key:
-        existing = IdempotencyKey.objects.filter(key=idem_key).first()
-        if existing:
-            return Response({
-                "payout_id": existing.payout.id,
-                "status": existing.payout.status
-            })
+    if balance < amount:
+        return Response({"error": "Insufficient balance"}, status=400)
 
-    with transaction.atomic():
-        balance = get_balance(merchant)
+    payout = Payout.objects.create(
+        merchant=merchant,
+        amount=amount,
+        status="pending"
+    )
 
-        if balance < amount:
-            return Response({"error": "Insufficient balance"}, status=400)
+    LedgerEntry.objects.create(
+        merchant=merchant,
+        amount=-amount,
+        type="debit"
+    )
 
-        payout = Payout.objects.create(
-            merchant=merchant,
-            amount=amount,
-            status="pending"
-        )
+    IdempotencyKey.objects.create(key=key, payout=payout)
 
-        # Debit ledger
-        LedgerEntry.objects.create(
-            merchant=merchant,
-            amount=amount,
-            type="debit"
-        )
-
-        if idem_key:
-            IdempotencyKey.objects.create(
-                key=idem_key,
-                payout=payout
-            )
-
-    return Response({
-        "payout_id": payout.id,
-        "status": payout.status
-    })
+    return Response({"payout_id": payout.id, "status": payout.status})
 
 
-# ------------------ Payout History ------------------
-@api_view(["GET"])
+@api_view(['GET'])
 def payout_list(request):
-    payouts = Payout.objects.all().order_by("-id")
-
-    data = [
-        {
-            "id": p.id,
-            "amount": p.amount,
-            "status": p.status
-        }
-        for p in payouts
-    ]
-
-    return Response(data)
+    payouts = Payout.objects.all().values()
+    return Response(list(payouts))
 
 
-# ------------------ Balance ------------------
-@api_view(["GET"])
+@api_view(['GET'])
 def get_balance_view(request, merchant_id):
-    try:
-        merchant = Merchant.objects.get(id=merchant_id)
-    except Merchant.DoesNotExist:
-        return Response({"balance": 0})
-
+    merchant, _ = Merchant.objects.get_or_create(
+        id=merchant_id,
+        defaults={"name": f"Merchant {merchant_id}"}
+    )
     balance = get_balance(merchant)
     return Response({"balance": balance})
 
 
-# ------------------ Add Credit ------------------
-@api_view(["POST"])
+@api_view(['POST'])
 def add_credit(request):
     merchant_id = request.data.get("merchant_id")
-    amount = request.data.get("amount")
-
-    if not merchant_id or not amount:
-        return Response({"error": "Missing fields"}, status=400)
+    amount = int(request.data.get("amount", 0))
 
     merchant, _ = Merchant.objects.get_or_create(
         id=merchant_id,
@@ -121,8 +69,8 @@ def add_credit(request):
 
     LedgerEntry.objects.create(
         merchant=merchant,
-        amount=int(amount),
+        amount=amount,
         type="credit"
     )
 
-    return Response({"message": "Balance added"})
+    return Response({"status": "credited"})
