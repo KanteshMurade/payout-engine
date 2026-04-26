@@ -1,178 +1,146 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <title>Payout Dashboard</title>
-  <style>
-    body {
-      font-family: Arial;
-      background: #0f172a;
-      color: white;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      height: 100vh;
-    }
+<meta charset="UTF-8">
+<title>Payout Dashboard</title>
 
-    .card {
-      background: #1e293b;
-      padding: 25px;
-      border-radius: 12px;
-      width: 340px;
-      box-shadow: 0 0 20px rgba(0,0,0,0.5);
-    }
+<style>
+body {
+    margin: 0;
+    font-family: Arial;
+    background: linear-gradient(to right, #0f172a, #1e293b);
+    color: white;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+}
+.card {
+    background: #1e293b;
+    padding: 30px;
+    border-radius: 12px;
+    width: 300px;
+    text-align: center;
+    box-shadow: 0 0 20px rgba(0,0,0,0.5);
+}
+input {
+    width: 100%;
+    padding: 10px;
+    margin: 10px 0;
+    border-radius: 6px;
+    border: none;
+}
+button {
+    width: 100%;
+    padding: 10px;
+    background: #22c55e;
+    border: none;
+    border-radius: 6px;
+    color: white;
+    cursor: pointer;
+}
+button:hover {
+    background: #16a34a;
+}
+.status {
+    margin-top: 10px;
+}
+.success { color: #22c55e; }
+.error { color: #ef4444; }
+.history {
+    text-align: left;
+    margin-top: 15px;
+}
+</style>
 
-    h2 {
-      text-align: center;
-      margin-bottom: 15px;
-    }
-
-    input {
-      width: 100%;
-      padding: 10px;
-      margin: 6px 0;
-      border-radius: 6px;
-      border: none;
-    }
-
-    button {
-      width: 100%;
-      padding: 10px;
-      margin-top: 10px;
-      background: #22c55e;
-      color: white;
-      border: none;
-      border-radius: 6px;
-      cursor: pointer;
-      font-weight: bold;
-    }
-
-    .success {
-      color: #4ade80;
-      margin-top: 10px;
-    }
-
-    .error {
-      color: #f87171;
-      margin-top: 10px;
-    }
-
-    .balance {
-      margin-top: 10px;
-      color: #facc15;
-      font-weight: bold;
-    }
-
-    .history {
-      margin-top: 15px;
-      font-size: 14px;
-    }
-
-    ul {
-      padding-left: 15px;
-    }
-  </style>
 </head>
-
 <body>
 
 <div class="card">
-  <h2>Create Payout</h2>
+    <h2>Create Payout</h2>
 
-  <input id="merchant" placeholder="Merchant ID" />
-  <input id="amount" placeholder="Amount (paise)" />
+    <input type="number" id="merchant" placeholder="Merchant ID" value="1">
+    <input type="number" id="amount" placeholder="Amount (paise)">
 
-  <button onclick="send()">Send</button>
+    <button onclick="createPayout()">Send</button>
 
-  <div id="balance" class="balance"></div>
-  <div id="result"></div>
+    <div id="balance"></div>
+    <div id="result" class="status"></div>
 
-  <div class="history">
-    <h3>History</h3>
-    <ul id="history"></ul>
-  </div>
+    <div class="history">
+        <h4>History</h4>
+        <ul id="history"></ul>
+    </div>
 </div>
 
 <script>
-const BASE_URL = "https://payout-engine.onrender.com";
+const API = "https://payout-engine.onrender.com/api/v1"; // your backend
 
-// CREATE PAYOUT
-async function send() {
-  const merchant = document.getElementById("merchant").value;
-  const amount = document.getElementById("amount").value;
+async function createPayout() {
+    const merchant = document.getElementById("merchant").value;
+    const amount = document.getElementById("amount").value;
 
-  if (!merchant || !amount) {
-    showError("Enter all fields");
-    return;
-  }
+    const resDiv = document.getElementById("result");
 
-  try {
-    const res = await fetch(BASE_URL + "/api/v1/payouts", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Idempotency-Key": Date.now()
-      },
-      body: JSON.stringify({
-        merchant_id: parseInt(merchant),
-        amount_paise: parseInt(amount)
-      })
-    });
+    try {
+        const res = await fetch(`${API}/payouts`, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "Idempotency-Key": Math.random().toString()
+            },
+            body: JSON.stringify({
+                merchant_id: merchant,
+                amount_paise: amount
+            })
+        });
 
+        const data = await res.json();
+
+        if (res.ok) {
+            resDiv.innerHTML = `✔ ID: ${data.payout_id} | ${data.status}`;
+            resDiv.className = "status success";
+        } else {
+            resDiv.innerHTML = `❌ ${data.error}`;
+            resDiv.className = "status error";
+        }
+
+        loadHistory();
+        loadBalance();
+
+    } catch (e) {
+        resDiv.innerHTML = "❌ Server not reachable";
+        resDiv.className = "status error";
+    }
+}
+
+async function loadHistory() {
+    const res = await fetch(`${API}/payouts/list/`);
     const data = await res.json();
 
-    if (!res.ok) {
-      showError(data.error || "Request failed");
-      return;
-    }
+    const list = document.getElementById("history");
+    list.innerHTML = "";
 
-    showSuccess(`✔ ID: ${data.payout_id} | ${data.status}`);
-
-    loadData(merchant);
-
-  } catch (err) {
-    showError("Server not reachable");
-  }
-}
-
-function showSuccess(msg) {
-  document.getElementById("result").innerHTML =
-    `<div class="success">${msg}</div>`;
-}
-
-function showError(msg) {
-  document.getElementById("result").innerHTML =
-    `<div class="error">❌ ${msg}</div>`;
-}
-
-// LOAD BALANCE + HISTORY
-async function loadData(merchant) {
-  try {
-    // Balance
-    const balRes = await fetch(BASE_URL + `/api/v1/merchant/${merchant}/`);
-    const balData = await balRes.json();
-
-    if (balRes.ok) {
-      document.getElementById("balance").innerText =
-        `💰 Balance: ${balData.balance}`;
-    }
-
-    // History
-    const res = await fetch(BASE_URL + `/api/v1/payouts/list/?merchant_id=${merchant}`);
-    const list = await res.json();
-
-    const ul = document.getElementById("history");
-    ul.innerHTML = "";
-
-    list.forEach(p => {
-      const li = document.createElement("li");
-      li.innerText = `ID ${p.id} | ₹${p.amount} | ${p.status}`;
-      ul.appendChild(li);
+    data.forEach(p => {
+        const li = document.createElement("li");
+        li.innerText = `ID ${p.id} | ₹${p.amount} | ${p.status}`;
+        list.appendChild(li);
     });
-
-  } catch (e) {
-    console.log("Error loading data", e);
-  }
 }
+
+async function loadBalance() {
+    const merchant = document.getElementById("merchant").value;
+
+    const res = await fetch(`${API}/balance/${merchant}`);
+    const data = await res.json();
+
+    document.getElementById("balance").innerHTML =
+        `💰 Balance: ₹${data.balance}`;
+}
+
+// auto load
+loadHistory();
+loadBalance();
 </script>
 
 </body>
