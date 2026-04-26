@@ -30,4 +30,4 @@ class Payout(models.Model):
 
 class IdempotencyKey(models.Model):
     key = models.CharField(max_length=100, unique=True)
-    payout = models.ForeignKey(Payout, on_delete=models.CASCADE)
+    payout = models.ForeignKey(Payout, on_delete=models.CASCADE, null=True, blank=True)
