@@ -108,6 +108,7 @@ def add_credit(request):
     merchant_id = request.data.get("merchant_id")
     amount = int(request.data.get("amount"))
 
+<<<<<<< HEAD
     merchant = Merchant.objects.get(id=merchant_id)
 
     LedgerEntry.objects.create(
@@ -117,3 +118,31 @@ def add_credit(request):
     )
 
     return Response({"message": "credit added"})
+=======
+    return Response({
+        "id": merchant.id,
+        "name": merchant.name,
+        "balance": merchant.balance
+    })
+
+@api_view(['POST'])
+def add_balance(request):
+    merchant_id = request.data.get("merchant_id")
+    amount = request.data.get("amount")
+
+    if not merchant_id or not amount:
+        return Response({"error": "Missing fields"}, status=400)
+
+    try:
+        merchant = Merchant.objects.get(id=merchant_id)
+    except Merchant.DoesNotExist:
+        return Response({"error": "Merchant not found"}, status=404)
+
+    merchant.balance += int(amount)
+    merchant.save()
+
+    return Response({
+        "message": "Balance added",
+        "balance": merchant.balance
+    })
+>>>>>>> 189d1be0b906f5b486987d26560ad3d988ef0f42
